@@ -1,0 +1,15 @@
+# Overlay opcional para atacar hosts de tu red local (192.168.x.x, 10.x.x.x...).
+#
+#   scripts/attack.sh --dns mi-servidor.local --port 80 --lan ...
+#
+# Anade al contenedor atacante una red con salida. Sin este fichero, el
+# laboratorio solo alcanza su propia red interna (172.28.0.0/16).
+services:
+  loadgen:
+    networks:
+      - lab
+      - lan
+
+networks:
+  lan:
+    driver: bridge

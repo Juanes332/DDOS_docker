@@ -1,0 +1,41 @@
+name: ddos-lab
+
+# Laboratorio de ataque.
+# - "lab" es una red INTERNA: los contenedores no salen a Internet.
+# - La victima se publica en 127.0.0.1:8000 para poder verla desde el navegador.
+# - Para atacar un host de tu LAN, usa docker-compose.lan.yml (--lan).
+
+services:
+  target:
+    build: ./target
+    container_name: ddoslab-target
+    environment:
+      MAX_INFLIGHT: "16"   # peticiones simultaneas que atiende
+      WORK_MS: "100"       # coste de cada peticion
+      BACKLOG: "128"       # cola de aceptacion TCP
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [lab, ui]
+    restart: unless-stopped
+
+  loadgen:
+    build: ./loadgen
+    container_name: ddoslab-loadgen
+    profiles: ["attack"]
+    networks: [lab]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+    command: ["--help"]
+
+networks:
+  lab:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+  ui:
+    driver: bridge
