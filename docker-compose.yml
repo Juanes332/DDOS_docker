@@ -3,7 +3,8 @@ name: ddos-lab
 # Laboratorio de ataque.
 # - "lab" es una red con salida a Internet: los contenedores alcanzan cualquier
 #   destino.
-# - La victima se publica en 127.0.0.1:8000 para poder verla desde el navegador.
+# - La victima se publica en el puerto 8000 de todas las interfaces (accesible
+#   desde fuera).
 
 services:
   target:
@@ -14,7 +15,7 @@ services:
       WORK_MS: "100"       # coste de cada peticion
       BACKLOG: "128"       # cola de aceptacion TCP
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     networks: [lab, ui]
     restart: unless-stopped
 

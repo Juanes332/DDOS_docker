@@ -7,7 +7,7 @@ ARGS ?=
 help:
 	@echo "DDOS Lab · laboratorio de ataque"
 	@echo
-	@echo "  make up        construye y levanta la victima (127.0.0.1:8000)"
+	@echo "  make up        construye y levanta la victima (puerto 8000, todas las interfaces)"
 	@echo "  make down      detiene todo"
 	@echo "  make reset     borra contenedores y red"
 	@echo "  make logs      logs de la victima"
@@ -27,7 +27,7 @@ init:
 up:
 	$(COMPOSE) up -d --build target
 	@echo
-	@echo "victima: http://127.0.0.1:8000"
+	@echo "victima: http://$$(hostname -I 2>/dev/null | cut -d' ' -f1):8000"
 
 down:
 	$(COMPOSE) --profile attack down --remove-orphans

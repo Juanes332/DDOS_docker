@@ -19,7 +19,7 @@ Requisitos: Docker con Compose v2, `make`, `python3`, `curl`.
 ```bash
 git clone git@github.com:Juanes332/DDOS_docker.git
 cd DDOS_docker
-make up          # víctima en http://127.0.0.1:8000
+make up          # víctima en http://<IP-del-host>:8000
 make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 ```
 
@@ -190,7 +190,7 @@ DDOS_docker/
 
 ## Para la clase
 
-1. `make up` y abre <http://127.0.0.1:8000> en el navegador.
+1. `make up` y abre <http://<IP-del-host>:8000> en el navegador.
 2. `make demo`: 3 contenedores a 100 req/s. La víctima aún responde `200`.
 3. Sube a `make forever N=3 REQUESTS=250 EVERY=1` (750 req/s) y mira aparecer los
    `503` en la consola y en las métricas de la víctima:
