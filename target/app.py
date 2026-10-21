@@ -57,35 +57,35 @@ def _render_metrics() -> bytes:
         }
 
     lines = [
-        "# HELP lab_requests_total Peticiones HTTP aceptadas por el worker pool.",
-        "# TYPE lab_requests_total counter",
-        f"lab_requests_total {snapshot['requests']}",
-        "# HELP lab_rejected_total Peticiones rechazadas por saturacion (503).",
-        "# TYPE lab_rejected_total counter",
-        f"lab_rejected_total {snapshot['rejected']}",
-        "# HELP lab_errors_total Peticiones que terminaron en error interno.",
-        "# TYPE lab_errors_total counter",
-        f"lab_errors_total {snapshot['errors']}",
-        "# HELP lab_inflight Peticiones en curso ahora mismo.",
-        "# TYPE lab_inflight gauge",
-        f"lab_inflight {snapshot['inflight']}",
-        "# HELP lab_uptime_seconds Segundos desde el arranque del proceso.",
-        "# TYPE lab_uptime_seconds gauge",
-        f"lab_uptime_seconds {time.time() - STARTED_AT:.3f}",
-        "# HELP lab_request_duration_seconds Latencia de las peticiones atendidas.",
-        "# TYPE lab_request_duration_seconds histogram",
+        "# HELP loadforge_requests_total Peticiones HTTP aceptadas por el worker pool.",
+        "# TYPE loadforge_requests_total counter",
+        f"loadforge_requests_total {snapshot['requests']}",
+        "# HELP loadforge_rejected_total Peticiones rechazadas por saturacion (503).",
+        "# TYPE loadforge_rejected_total counter",
+        f"loadforge_rejected_total {snapshot['rejected']}",
+        "# HELP loadforge_errors_total Peticiones que terminaron en error interno.",
+        "# TYPE loadforge_errors_total counter",
+        f"loadforge_errors_total {snapshot['errors']}",
+        "# HELP loadforge_inflight Peticiones en curso ahora mismo.",
+        "# TYPE loadforge_inflight gauge",
+        f"loadforge_inflight {snapshot['inflight']}",
+        "# HELP loadforge_uptime_seconds Segundos desde el arranque del proceso.",
+        "# TYPE loadforge_uptime_seconds gauge",
+        f"loadforge_uptime_seconds {time.time() - STARTED_AT:.3f}",
+        "# HELP loadforge_request_duration_seconds Latencia de las peticiones atendidas.",
+        "# TYPE loadforge_request_duration_seconds histogram",
     ]
     for bucket in BUCKETS:
         lines.append(
-            f'lab_request_duration_seconds_bucket{{le="{bucket}"}} '
+            f'loadforge_request_duration_seconds_bucket{{le="{bucket}"}} '
             f"{snapshot['buckets'][bucket]}"
         )
-    lines.append(f'lab_request_duration_seconds_bucket{{le="+Inf"}} {snapshot["inf"]}')
+    lines.append(f'loadforge_request_duration_seconds_bucket{{le="+Inf"}} {snapshot["inf"]}')
     lines.append(
-        f"lab_request_duration_seconds_sum {snapshot['duration_sum']:.6f}"
+        f"loadforge_request_duration_seconds_sum {snapshot['duration_sum']:.6f}"
     )
     lines.append(
-        f"lab_request_duration_seconds_count {snapshot['duration_count']}"
+        f"loadforge_request_duration_seconds_count {snapshot['duration_count']}"
     )
     return ("\n".join(lines) + "\n").encode()
 
@@ -94,7 +94,7 @@ class Handler(BaseHTTPRequestHandler):
     """Atiende los endpoints de la victima."""
 
     protocol_version = "HTTP/1.1"
-    server_version = "lab-target/1.0"
+    server_version = "loadforge-target/1.0"
 
     def log_message(self, fmt, *args):  # noqa: A003 - firma impuesta por la stdlib
         """Silencia el log por peticion para no ensuciar la salida."""

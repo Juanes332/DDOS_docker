@@ -1,4 +1,4 @@
-name: ddos-lab
+name: loadforge
 
 # Laboratorio de ataque.
 # - "lab" es una red con salida a Internet: los contenedores alcanzan cualquier
@@ -9,7 +9,7 @@ name: ddos-lab
 services:
   target:
     build: ./target
-    container_name: ddoslab-target
+    container_name: loadforge-target
     environment:
       MAX_INFLIGHT: "16"   # peticiones simultaneas que atiende
       WORK_MS: "100"       # coste de cada peticion
@@ -21,7 +21,7 @@ services:
 
   loadgen:
     build: ./loadgen
-    container_name: ddoslab-loadgen
+    container_name: loadforge-loadgen
     profiles: ["attack"]
     networks: [lab]
     deploy:

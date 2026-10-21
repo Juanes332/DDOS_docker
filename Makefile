@@ -5,7 +5,7 @@ COMPOSE := docker compose
 ARGS ?=
 
 help:
-	@echo "DDOS Lab · laboratorio de ataque"
+	@echo "LoadForge · pruebas de carga y resiliencia"
 	@echo
 	@echo "  make up        construye y levanta la victima (puerto 8000, todas las interfaces)"
 	@echo "  make down      detiene todo"

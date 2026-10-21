@@ -46,10 +46,13 @@ def resolve(host: str, port: int) -> str:
     except socket.gaierror as exc:
         raise ValueError(f"no se pudo resolver '{host}': {exc}") from exc
 
-    for info in infos:
-        if info[4][0]:
-            return info[4][0]
-    raise ValueError(f"'{host}' no tiene direcciones utilizables")
+    addresses = [info[4][0] for info in infos if info[4][0]]
+    if not addresses:
+        raise ValueError(f"'{host}' no tiene direcciones utilizables")
+    for ip in addresses:
+        if ":" not in ip:  # prefiere IPv4 (mas universal)
+            return ip
+    return addresses[0]
 
 
 def clamp(name: str, value: float, maximum: float) -> float:

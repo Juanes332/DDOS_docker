@@ -55,10 +55,13 @@ def resolve(host: str, port: int) -> str:
     except socket.gaierror as exc:
         raise ValueError(f"no se pudo resolver '{host}': {exc}") from exc
 
-    for info in infos:
-        if info[4][0]:
-            return info[4][0]
-    raise ValueError(f"'{host}' no tiene direcciones utilizables")
+    addresses = [info[4][0] for info in infos if info[4][0]]
+    if not addresses:
+        raise ValueError(f"'{host}' no tiene direcciones utilizables")
+    for ip in addresses:
+        if ":" not in ip:  # prefiere IPv4 (mas universal)
+            return ip
+    return addresses[0]
 
 
 def clamp(name: str, value: float, maximum: float) -> float:
@@ -76,7 +79,7 @@ def build_request(method: str, path: str, host_header: str, data: str, content_t
     headers = [
         f"{method} {path} HTTP/1.1",
         f"Host: {host_header}",
-        "User-Agent: ddos-lab/2.0",
+        "User-Agent: loadforge/2.0",
         "Accept: */*",
     ]
     body = data.encode() if data else b""
@@ -270,7 +273,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=None, help="puerto del destino (def. 80, o 443 con --https)")
     parser.add_argument("--path", default="/", help="ruta HTTP (def. /)")
     parser.add_argument("--method", default="GET", help="metodo HTTP (GET, POST, PUT, ...)")
-    parser.add_argument("--data", default="", help="cuerpo de la peticion (para POST/PUT)")
+    parser.add_argument("--data", default="", help="cuerpo de la peticion, o @archivo para leerlo de un fichero")
     parser.add_argument("--content-type", default="application/json", help="Content-Type cuando hay --data")
     parser.add_argument("--requests", type=int, default=50, help="peticiones por rafaga")
     parser.add_argument("--every", type=float, default=1.0, help="segundos entre rafagas")
@@ -287,6 +290,15 @@ def main() -> None:
 
     if args.port is None:
         args.port = 443 if args.https else 80
+
+    if args.data.startswith("@"):
+        body_file = args.data[1:]
+        try:
+            with open(body_file, encoding="utf-8") as fh:
+                args.data = fh.read()
+        except OSError as exc:
+            print(f"[abortado] no se pudo leer el cuerpo desde '{body_file}': {exc}")
+            raise SystemExit(2)
 
     try:
         host, port = parse_target(args.dns, args.port)

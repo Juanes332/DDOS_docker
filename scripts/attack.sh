@@ -45,7 +45,7 @@ uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
   --vector V         http | slowloris | conn | mixed           (def. http)
   --path RUTA        ruta HTTP a solicitar                     (def. /)
   --method M         metodo HTTP (GET, POST, ...)              (def. GET)
-  --data D           cuerpo del request (para POST/PUT)
+  --data D           cuerpo del request, o @archivo (para POST/PUT)
   --content-type T   Content-Type cuando hay --data            (def. application/json)
   --preset P         light | medium | hard
   --lan              permite salir a la red local (docker-compose.lan.yml)
@@ -67,8 +67,8 @@ ejemplos:
   scripts/attack.sh --dns victima.midominio.lab --port 8000 \
                     --resolve victima.midominio.lab=172.28.0.2 --requests 100 --every 1
 
-El destino se resuelve por DNS; no hay restriccion de red. Usa --lan para
-salir de la red aislada del lab hacia Internet o tu LAN.
+El destino se resuelve por DNS; no hay restriccion de red. Los contenedores
+tienen salida a Internet por defecto.
 USAGE
 }
 
@@ -223,7 +223,7 @@ fi
 # (COMPOSE_FILES ya se definio arriba)
 
 RUN_ID="$(date +%s)"
-LOG_DIR="${TMPDIR:-/tmp}/opencode/ddos-lab-${RUN_ID}"
+LOG_DIR="${TMPDIR:-/tmp}/loadforge-${RUN_ID}"
 mkdir -p "$LOG_DIR"
 
 declare -a PIDS=()
@@ -295,7 +295,7 @@ echo "[*] lanzando $CONTAINERS contenedor(es) · logs en $LOG_DIR"
 for ((i = 0; i < CONTAINERS; i++)); do
   local_vec="${WORK_VECTOR[$i]}"
   mapfile -d '' -t ARGS < <(args_for "$local_vec")
-  NAME="ddoslab-w${i}-${RUN_ID}"
+  NAME="loadforge-w${i}-${RUN_ID}"
   NAMES+=("$NAME")
   CID="$(docker compose "${COMPOSE_FILES[@]}" --profile attack run -d --no-deps \
     --name "$NAME" loadgen "${ARGS[@]}" 2>/dev/null | tail -n1 || true)"

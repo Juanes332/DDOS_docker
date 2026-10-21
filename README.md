@@ -220,7 +220,7 @@ contenedor, se recorta y se avisa.
 ## Estructura
 
 ```
-DDOS_docker/
+loadforge/
 ├── docker-compose.yml        # servicio objetivo + red con salida
 ├── docker-compose.lan.yml    # overlay opcional para tu LAN
 ├── Makefile
@@ -243,7 +243,7 @@ DDOS_docker/
    `503` en la consola y en las métricas de la víctima:
 
    ```bash
-   curl -s http://127.0.0.1:8000/metrics | grep -E "lab_(requests|rejected|inflight)"
+   curl -s http://127.0.0.1:8000/metrics | grep -E "loadforge_(requests|rejected|inflight)"
    ```
 
 4. `docker stats` para ver el coste en CPU de cada contenedor atacante.

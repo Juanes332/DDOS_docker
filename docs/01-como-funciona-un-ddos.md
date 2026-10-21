@@ -78,14 +78,14 @@ que el `503` aparece antes cuando además hay sockets colgados.
 ## Qué mirar en la víctima
 
 ```bash
-curl -s http://127.0.0.1:8000/metrics | grep -E "lab_(requests|rejected|inflight|request_duration)"
+curl -s http://127.0.0.1:8000/metrics | grep -E "loadforge_(requests|rejected|inflight|request_duration)"
 ```
 
-- `lab_requests_total` sube y `lab_rejected_total` se queda plano → la víctima
+- `loadforge_requests_total` sube y `loadforge_rejected_total` se queda plano → la víctima
   va sobrada.
-- `lab_rejected_total` sube → el pool está lleno; es el `503` que ves en consola.
-- `lab_inflight` pegado a `MAX_INFLIGHT` → saturación sostenida.
-- `lab_request_duration_seconds` → cuánto tarda lo que sí se atiende.
+- `loadforge_rejected_total` sube → el pool está lleno; es el `503` que ves en consola.
+- `loadforge_inflight` pegado a `MAX_INFLIGHT` → saturación sostenida.
+- `loadforge_request_duration_seconds` → cuánto tarda lo que sí se atiende.
 
 ## Lo que este laboratorio no reproduce
 
