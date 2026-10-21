@@ -80,11 +80,14 @@ def main() -> None:
         description="Agotamiento de cola TCP con conexiones reales (laboratorio)"
     )
     parser.add_argument("--dns", required=True, help="nombre DNS o IP del destino")
-    parser.add_argument("--port", type=int, required=True, help="puerto del destino")
+    parser.add_argument("--port", type=int, default=None, help="puerto del destino (def. 80)")
     parser.add_argument("--connections", type=int, default=200, help="conexiones a abrir")
     parser.add_argument("--duration", type=float, default=30.0, help="segundos")
     parser.add_argument("--forever", action="store_true", help="no termina hasta Ctrl+C")
     args = parser.parse_args()
+
+    if args.port is None:
+        args.port = 80
 
     try:
         host, port = parse_target(args.dns, args.port)

@@ -30,7 +30,7 @@ make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 | Bandera | Qué hace | Defecto |
 |---|---|---|
 | `--dns HOST` | nombre DNS (o IP) del objetivo | obligatorio |
-| `--port P` | puerto del objetivo | obligatorio |
+| `--port P` | puerto del objetivo (def. 80, o 443 con `--https`) | 80/443 |
 | `--requests N` | peticiones **por ráfaga y por contenedor** | 50 |
 | `--every S` | segundos entre ráfagas | 1 |
 | `--containers N` | cuántos contenedores atacan a la vez (sin tope) | 1 |
@@ -44,6 +44,7 @@ make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 | `--dns-server IP` | servidor DNS que usan los contenedores | el de Docker |
 | `--resolve NOMBRE=IP` | fija un nombre a una IP (repetible) | — |
 | `--dry-run` | muestra el plan y no lanza nada | — |
+| `--detach` | lanza los contenedores y sale (quedan en segundo plano) | — |
 
 La carga total es `N ÷ S × contenedores` peticiones por segundo. Ejemplos:
 

@@ -153,7 +153,8 @@ async def run(args, ip, host_header) -> None:
 
     print("=" * 66)
     scheme = "https" if args.https else "http"
-    print(f"  DESTINO   : {scheme}://{args.dns}:{args.port}{args.path}  ->  {ip}")
+    port_suffix = "" if args.port in (80, 443) else f":{args.port}"
+    print(f"  DESTINO   : {scheme}://{args.dns}{port_suffix}{args.path}  ->  {ip}")
     print(f"  PATRON    : {requests} peticiones cada {every:g}s"
           f"  ({requests / every:.0f} req/s por contenedor)")
     print(f"  MODO      : {'INFINITO (Ctrl+C para parar)' if args.forever else f'{args.duration:g}s'}")
@@ -260,7 +261,7 @@ def main() -> None:
         description="Flood HTTP por rafagas (laboratorio)"
     )
     parser.add_argument("--dns", required=True, help="nombre DNS o IP del destino")
-    parser.add_argument("--port", type=int, required=True, help="puerto del destino")
+    parser.add_argument("--port", type=int, default=None, help="puerto del destino (def. 80, o 443 con --https)")
     parser.add_argument("--path", default="/", help="ruta HTTP (def. /)")
     parser.add_argument("--requests", type=int, default=50, help="peticiones por rafaga")
     parser.add_argument("--every", type=float, default=1.0, help="segundos entre rafagas")
@@ -274,6 +275,9 @@ def main() -> None:
     )
     parser.add_argument("--timeout", type=float, default=3.0, help="timeout por peticion")
     args = parser.parse_args()
+
+    if args.port is None:
+        args.port = 443 if args.https else 80
 
     try:
         host, port = parse_target(args.dns, args.port)

