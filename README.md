@@ -1,11 +1,13 @@
-# DDOS Lab · laboratorio de ataque por ráfagas
+# Ciberseguridad · pruebas de carga, resiliencia y simulación de DoS
 
-Laboratorio Docker para demostrar en clase cómo se genera carga abusiva contra un
-servicio y qué le pasa por dentro: cuántas peticiones aguanta, cuándo empieza a
-responder `503`, cuántas conexiones sostiene.
+Herramienta Docker para generar carga de alto volumen contra un servicio y medir
+su comportamiento: cuántas peticiones aguanta, cuándo empieza a responder `503`,
+cuántas conexiones sostiene y cómo reacciona su capa de autenticación.
 
-Se configura con tres cosas: **DNS + puerto**, **cuántas peticiones por ráfaga** y
-**cada cuántos segundos** sale esa ráfaga. Puede correr indefinidamente.
+Se usa en ejercicios de **pentesting autorizado** y en pruebas de **capacidad y
+resiliencia**: flood de ráfagas HTTP, agotamiento de conexiones y slowloris. Se
+configura con **DNS + puerto**, **cuántas peticiones por ráfaga** y **cada cuántos
+segundos** sale esa ráfaga. Puede correr indefinidamente.
 
 ```bash
 make up
@@ -83,7 +85,7 @@ make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 | `--vector V` | `http`, `slowloris`, `conn`, `mixed` | http |
 | `--path RUTA` | ruta HTTP | `/` |
 | `--preset P` | `light` (25/s), `medium` (100/s), `hard` (250/s) | — |
-| `--lan` | permite alcanzar tu red local | solo red del lab |
+| `--lan` | red extra con salida (hoy redundante: `lab` ya sale) | con salida |
 | `--https` | habla TLS (se activa solo con `--port 443`) | según puerto |
 | `--dns-server IP` | servidor DNS que usan los contenedores | el de Docker |
 | `--resolve NOMBRE=IP` | fija un nombre a una IP (repetible) | — |
@@ -180,7 +182,7 @@ El destino se resuelve por DNS y se acepta cualquier dirección: puedes apuntar
 a un host de tu LAN o a un servicio en Internet (usa `--lan` para tener salida
 de red). Tú eres responsable de contar con autorización para el destino.
 
-**Dentro del lab** (por defecto, red aislada):
+**Dentro del entorno local**:
 
 ```bash
 scripts/attack.sh --dns target --port 8000 --requests 100 --every 1 --forever
@@ -198,7 +200,7 @@ scripts/attack.sh --dns victima.local --port 80 --requests 50 --every 1 --lan --
 necesaria para que Docker pueda resolver y alcanzar nombres de tu LAN. Sin esa
 bandera, el atacante solo existe dentro de `172.28.0.0/16`.
 
-## Topes del laboratorio
+## Límites de la herramienta
 
 Los límites están definidos en cada script de `loadgen/` (y el tope de
 contenedores en `scripts/attack.sh`):
@@ -219,7 +221,7 @@ contenedor, se recorta y se avisa.
 
 ```
 DDOS_docker/
-├── docker-compose.yml        # víctima + red aislada
+├── docker-compose.yml        # servicio objetivo + red con salida
 ├── docker-compose.lan.yml    # overlay opcional para tu LAN
 ├── Makefile
 ├── target/                   # víctima: HTTP con pool acotado
@@ -233,7 +235,7 @@ DDOS_docker/
     └── 02-etica-y-legal.md
 ```
 
-## Para la clase
+## Uso recomendado
 
 1. `make up` y abre <http://<IP-del-host>:8000> en el navegador.
 2. `make demo`: 3 contenedores a 100 req/s. La víctima aún responde `200`.
@@ -252,7 +254,7 @@ Guion ampliado en `docs/01-como-funciona-un-ddos.md`.
 
 ## Alcance
 
-Este repositorio es material docente. No incluye suplantación de IP, sockets
-crudos, reflexión ni amplificación. Atacar un sistema del que no eres
-responsable es un delito: úsalo con tu propio laboratorio o con autorización
-por escrito. Detalles en `docs/02-etica-y-legal.md`.
+Herramienta de ciberseguridad para pruebas autorizadas. No incluye suplantación
+de IP, sockets crudos, reflexión ni amplificación. Atacar un sistema del que no
+eres responsable es un delito: úsalo con tu propia infraestructura o con
+autorización por escrito. Detalles en `docs/02-etica-y-legal.md`.
