@@ -25,6 +25,9 @@ DRY_RUN=0
 USE_LAN=0
 HTTPS=0
 DETACH=0
+METHOD="GET"
+DATA=""
+CONTENT_TYPE="application/json"
 DNS_SERVER=""
 declare -a RESOLVE_MAP=()
 
@@ -41,6 +44,9 @@ uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
   --containers N     contenedores atacantes (sin tope)         (def. 1)
   --vector V         http | slowloris | conn | mixed           (def. http)
   --path RUTA        ruta HTTP a solicitar                     (def. /)
+  --method M         metodo HTTP (GET, POST, ...)              (def. GET)
+  --data D           cuerpo del request (para POST/PUT)
+  --content-type T   Content-Type cuando hay --data            (def. application/json)
   --preset P         light | medium | hard
   --lan              permite salir a la red local (docker-compose.lan.yml)
   --https            hablar TLS (se activa solo con --port 443)
@@ -71,6 +77,9 @@ while [[ $# -gt 0 ]]; do
     --dns|--target) HOST="${2:?falta valor}"; shift 2 ;;
     --port)         PORT="${2:?falta valor}"; shift 2 ;;
     --path)         ATTACK_PATH="${2:?falta valor}"; shift 2 ;;
+    --method)       METHOD="${2:?falta valor}"; shift 2 ;;
+    --data)         DATA="${2:?falta valor}"; shift 2 ;;
+    --content-type) CONTENT_TYPE="${2:?falta valor}"; shift 2 ;;
     --vector)       VECTOR="${2:?falta valor}"; shift 2 ;;
     --containers)   CONTAINERS="${2:?falta valor}"; shift 2 ;;
     --requests)     REQUESTS="${2:?falta valor}"; shift 2 ;;
@@ -260,6 +269,9 @@ args_for() {
       local extra=()
       (( FOREVER )) && extra+=(--forever) || extra+=(--duration "$DURATION")
       (( HTTPS )) && extra+=(--https)
+      extra+=(--method "$METHOD")
+      [[ -n "$DATA" ]] && extra+=(--data "$DATA")
+      [[ -n "$CONTENT_TYPE" ]] && extra+=(--content-type "$CONTENT_TYPE")
       printf '%s\0' http_flood.py --dns "$HOST" --port "$PORT" --path "$ATTACK_PATH" \
         --requests "$REQUESTS" --every "$EVERY" "${extra[@]}"
       ;;

