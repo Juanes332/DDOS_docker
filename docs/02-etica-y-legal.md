@@ -13,18 +13,15 @@ la oficina o el servicio de otra persona en la misma red siguen siendo ajenos.
 
 ## Cómo está acotado este laboratorio
 
-- Solo acepta destinos que resuelvan a **red local**: RFC1918, loopback o
-  link-local. Una dirección pública se rechaza antes de abrir un socket
-  (`loadgen/guard.py`).
+- El destino es libre: acepta cualquier dirección que resuelva por DNS. La
+  responsabilidad de apuntar solo a sistemas autorizados es tuya.
 - Por defecto, el atacante vive en una red Docker **interna** sin salida a
-  Internet ni a tu LAN. Alcanzar tu red local exige `--lan`, de forma explícita.
+  Internet ni a tu LAN. Alcanzar tu red local o Internet exige `--lan`, de
+  forma explícita.
 - Topes duros: 500 peticiones por ráfaga, 400 peticiones simultáneas, 1000
   sockets. Los contenedores no tienen tope: los limita tu hardware.
 - Sin suplantación de IP, sin sockets crudos, sin reflexión ni amplificación.
 - Cada contenedor es una IP atribuible: no hay anonimización.
-
-Estas barreras son parte del diseño, no un detalle. Si las quitas, el código deja
-de ser un laboratorio.
 
 ## Uso legítimo
 

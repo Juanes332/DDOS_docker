@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /lab
 
-COPY guard.py http_flood.py slowloris.py conn_exhaust.py ./
+COPY http_flood.py slowloris.py conn_exhaust.py ./
 
 RUN adduser -D -u 10002 loadgen
 USER loadgen

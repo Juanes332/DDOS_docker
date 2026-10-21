@@ -108,7 +108,7 @@ mediante un overlay temporal de Compose que se borra al terminar.
 
 En los dos casos el nombre aparece en el `Host` de cada petición, así que para
 los estudiantes (y para los logs de la víctima) es un dominio normal; lo que
-cambia es a dónde apunta: siempre una IP de tu red.
+cambia es a dónde apunta: la IP que fijes o que resuelva tu DNS.
 
 ### Puerto 443
 
@@ -131,8 +131,9 @@ CA interna, se aceptan ambos por defecto).
 
 ## Apuntar a tu propio servicio
 
-El destino se resuelve por DNS y se comprueba que la IP sea **de red local**
-(RFC1918, loopback o link-local). Nunca se envía tráfico a direcciones públicas.
+El destino se resuelve por DNS y se acepta cualquier dirección: puedes apuntar
+a un host de tu LAN o a un servicio en Internet (usa `--lan` para tener salida
+de red). Tú eres responsable de contar con autorización para el destino.
 
 **Dentro del lab** (por defecto, red aislada):
 
@@ -154,7 +155,8 @@ bandera, el atacante solo existe dentro de `172.28.0.0/16`.
 
 ## Topes del laboratorio
 
-Los límites están en `loadgen/guard.py` y en `scripts/attack.sh`:
+Los límites están definidos en cada script de `loadgen/` (y el tope de
+contenedores en `scripts/attack.sh`):
 
 ```python
 MAX_REQUESTS = 500       # peticiones por ráfaga
@@ -177,7 +179,6 @@ DDOS_docker/
 ├── Makefile
 ├── target/                   # víctima: HTTP con pool acotado
 ├── loadgen/
-│   ├── guard.py              # resolución DNS + validación de red local
 │   ├── http_flood.py         # ráfagas HTTP (vector principal)
 │   ├── slowloris.py          # cabeceras incompletas
 │   └── conn_exhaust.py       # agotamiento de cola TCP
@@ -206,8 +207,7 @@ Guion ampliado en `docs/01-como-funciona-un-ddos.md`.
 
 ## Alcance
 
-Este repositorio es material docente. Solo acepta destinos de red local y no
-incluye suplantación de IP, sockets crudos, reflexión ni amplificación. Atacar
-un sistema del que no eres responsable es un delito, aunque el destino sea una
-IP privada: úsalo con tu propio laboratorio o con autorización por escrito.
-Detalles en `docs/02-etica-y-legal.md`.
+Este repositorio es material docente. No incluye suplantación de IP, sockets
+crudos, reflexión ni amplificación. Atacar un sistema del que no eres
+responsable es un delito: úsalo con tu propio laboratorio o con autorización
+por escrito. Detalles en `docs/02-etica-y-legal.md`.

@@ -59,7 +59,8 @@ ejemplos:
   scripts/attack.sh --dns victima.midominio.lab --port 8000 \
                     --resolve victima.midominio.lab=172.28.0.2 --requests 100 --every 1
 
-Solo se permiten destinos de red local (RFC1918, loopback, link-local).
+El destino se resuelve por DNS; no hay restriccion de red. Usa --lan para
+salir de la red aislada del lab hacia Internet o tu LAN.
 USAGE
 }
 
@@ -151,34 +152,8 @@ if [[ -n "$DNS_SERVER" ]] || (( ${#RESOLVE_MAP[@]} > 0 )); then
   echo "[dns] overlay: $OVERRIDE_FILE"
 fi
 
-# --- validacion del destino dentro de la red del lab (falla rapido) ----------
-
-docker compose "${COMPOSE_FILES[@]}" --profile attack build loadgen >/dev/null 2>&1
-
-VALIDATION_ERR="$(mktemp)"
-if ! VALIDATION_OUT="$(docker compose "${COMPOSE_FILES[@]}" --profile attack run --rm --no-deps \
-      -e "TARGET_HOST=$HOST" -e "TARGET_PORT=$PORT" loadgen -c '
-import os
-import sys
-from guard import GuardError, parse_target, resolve
-
-try:
-    host, port = parse_target(os.environ["TARGET_HOST"], int(os.environ["TARGET_PORT"]))
-    ip = resolve(host, port)
-except GuardError as exc:
-    print(f"[abortado] {exc}")
-    raise SystemExit(2)
-
-print(f"[ok] {host}:{port} -> {ip}")
-' 2>"$VALIDATION_ERR")"; then
-  [[ -n "${VALIDATION_OUT:-}" ]] && echo "$VALIDATION_OUT" >&2
-  grep -vE "^ ?Container " "$VALIDATION_ERR" >&2 || true
-  rm -f "$VALIDATION_ERR"
-  echo "[abortado] destino no valido; no se lanza nada" >&2
-  exit 2
-fi
-rm -f "$VALIDATION_ERR"
-echo "$VALIDATION_OUT"
+# --- construccion del generador ----------------------------------------------
+docker compose "${COMPOSE_FILES[@]}" --profile attack build loadgen >/dev/null
 
 # --- plan ---------------------------------------------------------------------
 declare -a WORK_VECTOR=()
@@ -223,13 +198,8 @@ if (( DRY_RUN )); then
   exit 0
 fi
 
-if ! docker compose ps --status running --services 2>/dev/null | grep -qx target; then
-  echo "la victima no esta levantada. Ejecuta 'make up'." >&2
-  exit 1
-fi
-
 # --- preparacion --------------------------------------------------------------
-# (COMPOSE_FILES ya se definio al validar el destino)
+# (COMPOSE_FILES ya se definio arriba)
 
 RUN_ID="$(date +%s)"
 LOG_DIR="${TMPDIR:-/tmp}/opencode/ddos-lab-${RUN_ID}"

