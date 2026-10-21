@@ -12,6 +12,50 @@ make up
 scripts/attack.sh --dns target --port 8000 --requests 100 --every 1 --forever
 ```
 
+## Política de seguridad y uso autorizado
+
+Esta herramienta genera tráfico de alto volumen y puede saturar un servicio. Su
+uso está permitido **únicamente** contra:
+
+1. Sistemas de tu propiedad.
+2. Sistemas para los que tengas **autorización por escrito** del propietario y,
+   cuando aplique, del proveedor de hosting/red.
+
+**Está prohibido** apuntarla a cualquier sistema del que no seas responsable o
+del que no tengas autorización, aunque la IP sea privada, aunque sea "solo para
+probar", aunque el destino sea de un conocido o de la misma red.
+
+### Legal
+
+Lanzar un ataque de denegación de servicio (DDoS) es delito en la mayoría de
+ordenamientos. Ejemplos:
+
+- España: arts. 264 y siguientes del Código Penal.
+- Colombia: Ley 1273 de 2009 (delitos informáticos).
+- Estados Unidos: Computer Fraud and Abuse Act (18 U.S.C. § 1030).
+
+La intención educativa o de "prueba" no elimina la responsabilidad: lo que
+cuenta es el efecto sobre el sistema de un tercero.
+
+### Antes de lanzar nada
+
+1. **¿Es tuyo?** Si la respuesta no es un "sí" rotundo, no lo lances.
+2. **Autorización por escrito** del propietario del sistema y, si aplica, del
+   proveedor de red/hosting. Muchos contratos de hosting prohíben explícitamente
+   las pruebas de denegación de servicio.
+3. **Alcance definido**: hosts, rutas, intensidad máxima, ventana acordada y
+   criterio de parada.
+4. Para medir un servicio en Internet, usa un **proveedor de pruebas de carga**
+   que coordine con el ISP, no este flood de ráfagas.
+
+### Reportar uso indebido
+
+Si ves este repositorio o esta herramienta usados contra sistemas no autorizados,
+repórtalo al propietario del repositorio o a las autoridades competentes. No
+participes ni ayudes a amplificar un ataque contra terceros.
+
+Detalles ampliados en `docs/02-etica-y-legal.md`.
+
 ## Instalación
 
 Requisitos: Docker con Compose v2, `make`, `python3`, `curl`.
