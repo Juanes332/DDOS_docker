@@ -23,7 +23,8 @@ FOREVER=0
 PRESET=""
 DRY_RUN=0
 USE_LAN=0
-MAX_CONTAINERS=20
+DNS_SERVER=""
+declare -a RESOLVE_MAP=()
 
 usage() {
   cat <<'USAGE'
@@ -35,17 +36,26 @@ uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
   --every S          segundos entre rafagas                    (def. 1)
   --forever          no termina hasta Ctrl+C
   --duration S       duracion total si no es --forever         (def. 30)
-  --containers N     contenedores atacantes, 1..20             (def. 1)
+  --containers N     contenedores atacantes (sin tope)         (def. 1)
   --vector V         http | slowloris | conn | mixed           (def. http)
   --path RUTA        ruta HTTP a solicitar                     (def. /)
   --preset P         light | medium | hard
   --lan              permite salir a la red local (docker-compose.lan.yml)
+  --dns-server IP    servidor DNS que usan los contenedores
+  --resolve N=IP     fija el nombre N a la IP indicada (repetible)
   --dry-run          muestra el plan sin lanzar nada
 
 ejemplos:
   scripts/attack.sh --dns victima.local --port 8000 --requests 100 --every 1 --forever
   scripts/attack.sh --dns target --port 8000 --requests 200 --every 0.5 --containers 4 --duration 20
-  scripts/attack.sh --dns 192.168.1.50 --port 80 --requests 50 --every 2 --lan
+
+  # dominio con contexto, resuelto por tu DNS local hacia una IP del lab
+  scripts/attack.sh --dns victima.midominio.lab --port 8000 \
+                    --dns-server 172.28.0.1 --requests 100 --every 1 --forever
+
+  # mismo caso, sin servidor DNS: fija el nombre a la IP de la victima
+  scripts/attack.sh --dns victima.midominio.lab --port 8000 \
+                    --resolve victima.midominio.lab=172.28.0.2 --requests 100 --every 1
 
 Solo se permiten destinos de red local (RFC1918, loopback, link-local).
 USAGE
@@ -62,6 +72,8 @@ while [[ $# -gt 0 ]]; do
     --every)        EVERY="${2:?falta valor}"; shift 2 ;;
     --duration)     DURATION="${2:?falta valor}"; shift 2 ;;
     --preset)       PRESET="${2:?falta valor}"; shift 2 ;;
+    --dns-server)   DNS_SERVER="${2:?falta valor}"; shift 2 ;;
+    --resolve)      RESOLVE_MAP+=("${2:?falta valor}"); shift 2 ;;
     --forever)      FOREVER=1; shift ;;
     --lan)          USE_LAN=1; shift ;;
     --dry-run)      DRY_RUN=1; shift ;;
@@ -101,17 +113,40 @@ esac
 if ! [[ "$CONTAINERS" =~ ^[0-9]+$ ]] || (( CONTAINERS < 1 )); then
   echo "--containers debe ser un entero >= 1" >&2; exit 1
 fi
-if (( CONTAINERS > MAX_CONTAINERS )); then
-  echo "--containers $CONTAINERS excede el tope; se usa $MAX_CONTAINERS" >&2
-  CONTAINERS=$MAX_CONTAINERS
-fi
 if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
   echo "--port invalido: $PORT" >&2; exit 1
 fi
 
-# --- validacion del destino dentro de la red del lab (falla rapido) ----------
+# --- overlay temporal para DNS propio o nombres fijados ----------------------
 COMPOSE_FILES=(-f docker-compose.yml)
 (( USE_LAN )) && COMPOSE_FILES+=(-f docker-compose.lan.yml)
+
+OVERRIDE_DIR="$(mktemp -d)"
+OVERRIDE_FILE="$OVERRIDE_DIR/loadgen-override.yml"
+if [[ -n "$DNS_SERVER" ]] || (( ${#RESOLVE_MAP[@]} > 0 )); then
+  {
+    echo "services:"
+    echo "  loadgen:"
+    if [[ -n "$DNS_SERVER" ]]; then
+      echo "    dns:"
+      echo "      - $DNS_SERVER"
+    fi
+    if (( ${#RESOLVE_MAP[@]} > 0 )); then
+      echo "    extra_hosts:"
+      for entry in "${RESOLVE_MAP[@]}"; do
+        if [[ "$entry" != *=* ]]; then
+          echo "formato invalido en --resolve: '$entry' (usa NOMBRE=IP)" >&2
+          exit 1
+        fi
+        echo "      - \"${entry%%=*}:${entry#*=}\""
+      done
+    fi
+  } >"$OVERRIDE_FILE"
+  COMPOSE_FILES+=(-f "$OVERRIDE_FILE")
+  echo "[dns] overlay: $OVERRIDE_FILE"
+fi
+
+# --- validacion del destino dentro de la red del lab (falla rapido) ----------
 
 docker compose "${COMPOSE_FILES[@]}" --profile attack build loadgen >/dev/null 2>&1
 
@@ -166,6 +201,12 @@ echo "  MODO        : $([[ $FOREVER -eq 1 ]] && echo 'INFINITO (Ctrl+C)' || echo
 echo "  CONTENEDORES: $CONTAINERS"
 echo "  VECTOR      : $VECTOR"
 echo "  RED         : $([[ $USE_LAN -eq 1 ]] && echo 'lab + LAN' || echo 'solo lab (aislada)')"
+if [[ -n "$DNS_SERVER" ]]; then
+  echo "  DNS SERVER  : $DNS_SERVER"
+fi
+if (( ${#RESOLVE_MAP[@]} > 0 )); then
+  echo "  RESOLVE     : ${RESOLVE_MAP[*]}"
+fi
 echo "=============================================================="
 for ((i = 0; i < CONTAINERS; i++)); do
   echo "  w$i -> ${WORK_VECTOR[$i]}"
@@ -207,6 +248,7 @@ cleanup() {
     docker logs "$cid" >"$LOG_DIR/w${i}.log" 2>&1 || true
     docker rm -f "$cid" >/dev/null 2>&1 || true
   done
+  [[ -n "${OVERRIDE_DIR:-}" ]] && rm -rf "$OVERRIDE_DIR"
 }
 
 interrupted=0

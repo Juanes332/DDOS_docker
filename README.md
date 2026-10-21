@@ -33,13 +33,15 @@ make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 | `--port P` | puerto del objetivo | obligatorio |
 | `--requests N` | peticiones **por ráfaga y por contenedor** | 50 |
 | `--every S` | segundos entre ráfagas | 1 |
-| `--containers N` | cuántos contenedores atacan a la vez (1–20) | 1 |
+| `--containers N` | cuántos contenedores atacan a la vez (sin tope) | 1 |
 | `--forever` | no termina hasta `Ctrl+C` | finito |
 | `--duration S` | duración si no usas `--forever` | 30 |
 | `--vector V` | `http`, `slowloris`, `conn`, `mixed` | http |
 | `--path RUTA` | ruta HTTP | `/` |
 | `--preset P` | `light` (25/s), `medium` (100/s), `hard` (250/s) | — |
 | `--lan` | permite alcanzar tu red local | solo red del lab |
+| `--dns-server IP` | servidor DNS que usan los contenedores | el de Docker |
+| `--resolve NOMBRE=IP` | fija un nombre a una IP (repetible) | — |
 | `--dry-run` | muestra el plan y no lanza nada | — |
 
 La carga total es `N ÷ S × contenedores` peticiones por segundo. Ejemplos:
@@ -78,6 +80,35 @@ Una línea por ráfaga y por contenedor:
 El contador `[wN]` identifica el contenedor, es decir, la IP de origen. Con
 `--containers 5` ves cinco secuencias distintas atacando a la vez.
 
+## DNS con contexto (dominio real, tráfico local)
+
+El destino se escribe como nombre DNS, así que puedes usar un dominio con
+contexto (`victima.midominio.lab`, `app.empresa.test`…) en lugar de una IP.
+Dos formas de resolverlo:
+
+**1. Con tu servidor DNS** (el que tiene la zona):
+
+```bash
+scripts/attack.sh --dns victima.midominio.lab --port 8000 \
+                  --dns-server 192.168.1.10 --lan \
+                  --requests 100 --every 1 --forever
+```
+
+**2. Fijando el nombre a una IP del lab**, sin montar DNS:
+
+```bash
+scripts/attack.sh --dns victima.midominio.lab --port 8000 \
+                  --resolve victima.midominio.lab=172.28.0.2 \
+                  --requests 100 --every 1 --forever
+```
+
+`--resolve` es repetible. Ambas opciones se aplican solo al contenedor atacante,
+mediante un overlay temporal de Compose que se borra al terminar.
+
+En los dos casos el nombre aparece en el `Host` de cada petición, así que para
+los estudiantes (y para los logs de la víctima) es un dominio normal; lo que
+cambia es a dónde apunta: siempre una IP de tu red.
+
 ## Apuntar a tu propio servicio
 
 El destino se resuelve por DNS y se comprueba que la IP sea **de red local**
@@ -112,7 +143,10 @@ MAX_SOCKETS = 1000       # slowloris
 MAX_CONNECTIONS = 500    # cola TCP
 ```
 
-Y `MAX_CONTAINERS = 20` en el orquestador. Si pides más, se recorta y se avisa.
+No hay tope de contenedores: `--containers` acepta cualquier entero ≥ 1 y el
+límite real es la CPU y la memoria de tu máquina. Cada contenedor está limitado
+a 1 vCPU y 256 MB en `docker-compose.yml`. Si pides más intensidad por
+contenedor, se recorta y se avisa.
 
 ## Estructura
 

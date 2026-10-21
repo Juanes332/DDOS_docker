@@ -52,8 +52,10 @@ def resolve(host: str, port: int) -> ipaddress.IPv4Address:
     raise GuardError(
         f"'{host}' resuelve a {addresses[0]}, que es una dirección pública.\n"
         "  Este laboratorio solo ataca destinos de la red local (RFC1918, loopback,\n"
-        "  link-local). Para medir un servicio tuyo en Internet usa un proveedor de\n"
-        "  pruebas de carga con autorización por escrito."
+        "  link-local). Si quieres usar un dominio con contexto, apunta ese nombre a\n"
+        "  una IP del lab y resuélvelo con --dns-server o --resolve.\n"
+        "  Para medir un servicio tuyo en Internet usa un proveedor de pruebas de\n"
+        "  carga con autorización por escrito."
     )
 
 

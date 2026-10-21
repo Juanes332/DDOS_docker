@@ -14,6 +14,8 @@ help:
 	@echo
 	@echo "  make attack ARGS=\"--dns target --port 8000 --requests 100 --every 1\""
 	@echo "  make forever N=3 REQUESTS=100 EVERY=1     ataque infinito (Ctrl+C)"
+	@echo "  make attack ARGS=\"--dns dominio.lab --port 8000 --dns-server 192.168.1.10 --lan\""
+	@echo "  make attack ARGS=\"--dns dominio.lab --port 8000 --resolve dominio.lab=172.28.0.2\""
 	@echo "  make demo      levanta la victima y lanza 3 contenedores infinitos"
 	@echo "  make lan DNS=mi-host.local PORT=80 N=2    contra un host de tu LAN"
 	@echo

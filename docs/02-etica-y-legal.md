@@ -18,8 +18,8 @@ la oficina o el servicio de otra persona en la misma red siguen siendo ajenos.
   (`loadgen/guard.py`).
 - Por defecto, el atacante vive en una red Docker **interna** sin salida a
   Internet ni a tu LAN. Alcanzar tu red local exige `--lan`, de forma explícita.
-- Topes duros: 500 peticiones por ráfaga, 20 contenedores, 400 peticiones
-  simultáneas, 1000 sockets.
+- Topes duros: 500 peticiones por ráfaga, 400 peticiones simultáneas, 1000
+  sockets. Los contenedores no tienen tope: los limita tu hardware.
 - Sin suplantación de IP, sin sockets crudos, sin reflexión ni amplificación.
 - Cada contenedor es una IP atribuible: no hay anonimización.
 
