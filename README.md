@@ -40,6 +40,7 @@ make demo        # 3 contenedores · 100 peticiones cada 1 s · infinito
 | `--path RUTA` | ruta HTTP | `/` |
 | `--preset P` | `light` (25/s), `medium` (100/s), `hard` (250/s) | — |
 | `--lan` | permite alcanzar tu red local | solo red del lab |
+| `--https` | habla TLS (se activa solo con `--port 443`) | según puerto |
 | `--dns-server IP` | servidor DNS que usan los contenedores | el de Docker |
 | `--resolve NOMBRE=IP` | fija un nombre a una IP (repetible) | — |
 | `--dry-run` | muestra el plan y no lanza nada | — |
@@ -108,6 +109,25 @@ mediante un overlay temporal de Compose que se borra al terminar.
 En los dos casos el nombre aparece en el `Host` de cada petición, así que para
 los estudiantes (y para los logs de la víctima) es un dominio normal; lo que
 cambia es a dónde apunta: siempre una IP de tu red.
+
+### Puerto 443
+
+Con `--port 443` el generador habla TLS automáticamente (y acepta certificados
+self-signed; usa `--https` en otros puertos TLS). Ejemplo completo, sin
+`--resolve`, con tu DNS resolviendo el nombre:
+
+```bash
+scripts/attack.sh \
+  --dns victima.midominio.lab --port 443 \
+  --dns-server 192.168.1.10 --lan \
+  --requests 100 --every 1 --containers 3 \
+  --forever
+```
+
+Si el nombre no resuelve dentro del contenedor, el script aborta antes de enviar
+nada, así que no hay sorpresas a mitad del ataque. La víctima del lab sirve HTTP
+en `8000`; para un 443 real apunta a tu propio servicio con TLS (self-signed o
+CA interna, se aceptan ambos por defecto).
 
 ## Apuntar a tu propio servicio
 

@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import json
 import signal
+import ssl
 import time
 
 from guard import (
@@ -27,15 +28,27 @@ from guard import (
 )
 
 
-async def _one(ip: str, port: int, path: str, host_header: str, timeout: float, sem) -> tuple[int, float]:
+async def _one(
+    ip: str,
+    port: int,
+    path: str,
+    host_header: str,
+    sni: str,
+    ctx,
+    timeout: float,
+    sem,
+) -> tuple[int, float]:
     """Una peticion GET. Devuelve (codigo, latencia_ms); 0 si no hubo respuesta."""
     started = time.perf_counter()
     async with sem:
         try:
             reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(ip, port), timeout=timeout
+                asyncio.open_connection(
+                    ip, port, ssl=ctx, server_hostname=sni if ctx else None
+                ),
+                timeout=timeout,
             )
-        except (OSError, asyncio.TimeoutError):
+        except (OSError, asyncio.TimeoutError, ssl.SSLError):
             return 0, (time.perf_counter() - started) * 1000
 
         try:
@@ -63,10 +76,14 @@ async def _one(ip: str, port: int, path: str, host_header: str, timeout: float, 
                 pass
 
 
-async def _burst(ip, port, path, host_header, requests, timeout, sem) -> list[tuple[int, float]]:
+async def _burst(
+    ip, port, path, host_header, sni, ctx, requests, timeout, sem
+) -> list[tuple[int, float]]:
     """Lanza `requests` peticiones en paralelo, acotadas por el semaforo."""
     tasks = [
-        asyncio.create_task(_one(ip, port, path, host_header, timeout, sem))
+        asyncio.create_task(
+            _one(ip, port, path, host_header, sni, ctx, timeout, sem)
+        )
         for _ in range(requests)
     ]
     return await asyncio.gather(*tasks)
@@ -92,12 +109,21 @@ async def run(args, ip, host_header) -> None:
         print(f"[guard] ritmo ajustado a {requests} peticiones cada {every:g}s")
 
     print("=" * 66)
-    print(f"  DESTINO   : {args.dns}:{args.port}{args.path}  ->  {ip}")
+    scheme = "https" if args.https else "http"
+    print(f"  DESTINO   : {scheme}://{args.dns}:{args.port}{args.path}  ->  {ip}")
     print(f"  PATRON    : {requests} peticiones cada {every:g}s"
           f"  ({requests / every:.0f} req/s por contenedor)")
     print(f"  MODO      : {'INFINITO (Ctrl+C para parar)' if args.forever else f'{args.duration:g}s'}")
     print(f"  AMBITO    : solo red local; sin salida a Internet")
     print("=" * 66, flush=True)
+
+    ctx = None
+    if args.https:
+        ctx = ssl.create_default_context()
+        if not args.verify:
+            # Certificados de laboratorio: self-signed o CA propia.
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
     # Ctrl+C y SIGTERM (docker stop) paran el bucle de forma ordenada para que
     # el resumen final se imprima igualmente.
@@ -121,7 +147,15 @@ async def run(args, ip, host_header) -> None:
             break
 
         results = await _burst(
-            ip, args.port, args.path, host_header, requests, args.timeout, sem
+            ip,
+            args.port,
+            args.path,
+            host_header,
+            args.dns,
+            ctx,
+            requests,
+            args.timeout,
+            sem,
         )
         bursts += 1
         codes: dict[int, int] = {}
@@ -189,6 +223,12 @@ def main() -> None:
     parser.add_argument("--every", type=float, default=1.0, help="segundos entre rafagas")
     parser.add_argument("--duration", type=float, default=30.0, help="segundos totales")
     parser.add_argument("--forever", action="store_true", help="no termina hasta Ctrl+C")
+    parser.add_argument("--https", action="store_true", help="hablar TLS (puerto 443)")
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="validar el certificado (por defecto se acepta cualquiera, para labs)",
+    )
     parser.add_argument("--timeout", type=float, default=3.0, help="timeout por peticion")
     args = parser.parse_args()
 
@@ -200,7 +240,9 @@ def main() -> None:
         raise SystemExit(2)
 
     args.dns, args.port = host, port
-    host_header = host if port in (80, 8080) else f"{host}:{port}"
+    if port == 443:
+        args.https = True
+    host_header = host if port in (80, 443, 8080) else f"{host}:{port}"
 
     if not args.forever:
         args.duration = clamp("duration", args.duration, MAX_DURATION)

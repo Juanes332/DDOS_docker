@@ -23,6 +23,7 @@ FOREVER=0
 PRESET=""
 DRY_RUN=0
 USE_LAN=0
+HTTPS=0
 DNS_SERVER=""
 declare -a RESOLVE_MAP=()
 
@@ -41,6 +42,7 @@ uso: scripts/attack.sh --dns HOST --port PUERTO [opciones]
   --path RUTA        ruta HTTP a solicitar                     (def. /)
   --preset P         light | medium | hard
   --lan              permite salir a la red local (docker-compose.lan.yml)
+  --https            hablar TLS (se activa solo con --port 443)
   --dns-server IP    servidor DNS que usan los contenedores
   --resolve N=IP     fija el nombre N a la IP indicada (repetible)
   --dry-run          muestra el plan sin lanzar nada
@@ -76,6 +78,8 @@ while [[ $# -gt 0 ]]; do
     --resolve)      RESOLVE_MAP+=("${2:?falta valor}"); shift 2 ;;
     --forever)      FOREVER=1; shift ;;
     --lan)          USE_LAN=1; shift ;;
+    --https)        HTTPS=1; shift ;;
+    --http)         HTTPS=0; shift ;;
     --dry-run)      DRY_RUN=1; shift ;;
     -h|--help)      usage; exit 0 ;;
     *) echo "opcion desconocida: $1" >&2; usage; exit 1 ;;
@@ -116,6 +120,7 @@ fi
 if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
   echo "--port invalido: $PORT" >&2; exit 1
 fi
+(( PORT == 443 )) && HTTPS=1
 
 # --- overlay temporal para DNS propio o nombres fijados ----------------------
 COMPOSE_FILES=(-f docker-compose.yml)
@@ -196,6 +201,7 @@ UNITS="$REQUESTS peticiones"
 
 echo "=============================================================="
 echo "  DESTINO     : $HOST:$PORT$ATTACK_PATH"
+echo "  PROTOCOLO   : $([[ $HTTPS -eq 1 ]] && echo HTTPS || echo HTTP)"
 echo "  PATRON      : $UNITS cada ${EVERY}s por contenedor"
 echo "  MODO        : $([[ $FOREVER -eq 1 ]] && echo 'INFINITO (Ctrl+C)' || echo "${DURATION}s")"
 echo "  CONTENEDORES: $CONTAINERS"
@@ -269,6 +275,7 @@ args_for() {
     http)
       local extra=()
       (( FOREVER )) && extra+=(--forever) || extra+=(--duration "$DURATION")
+      (( HTTPS )) && extra+=(--https)
       printf '%s\0' http_flood.py --dns "$HOST" --port "$PORT" --path "$ATTACK_PATH" \
         --requests "$REQUESTS" --every "$EVERY" "${extra[@]}"
       ;;
